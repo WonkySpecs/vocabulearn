@@ -7,6 +7,7 @@ use std::process;
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
+use csv::DeserializeRecordsIter;
 
 const VOCAB_FILE: &str = "vocab.csv";
 const LABELS_FILE: &str = "labels.csv";
@@ -55,7 +56,33 @@ fn parse_input_vocab(items: Vec<VocabItem>) -> HashMap<usize, VocabItem> {
         .collect()
 }
 
-fn main() {
+fn read_labels_file() -> Result<Vec<Label>, Box<dyn Error>> {
+    let mut rdr = csv::Reader::from_path(LABELS_FILE)?;
+    Ok(rdr.deserialize()
+        .map(Result::unwrap)
+        .collect())
+}
+
+fn parse_input_labels(items: Vec<Label>) -> HashMap<usize, Label> {
+    items.into_iter()
+        .map(|i| (i.id, i))
+        .collect()
+}
+
+fn read_vocab_labels_file() -> Result<Vec<ItemLabel>, Box<dyn Error>> {
+    let mut rdr = csv::Reader::from_path(LABEL_MAP_FILE)?;
+    Ok(rdr.deserialize()
+        .map(Result::unwrap)
+        .collect())
+}
+
+fn parse_label_to_item_map(items: Vec<ItemLabel>) -> HashMap<usize, usize> {
+    items.into_iter()
+        .map(|i| (i.label_id, i.item_id))
+        .collect()
+}
+
+fn load_data() -> (HashMap<usize, VocabItem>, HashMap<usize, Label>, HashMap<usize, usize>) {
     let input = read_vocab_file();
     let vocab = match input {
         Err(e) => {
@@ -65,4 +92,32 @@ fn main() {
         Ok(i) => parse_input_vocab(i)
     };
     println!("{:?}", vocab);
+
+    let input = read_labels_file();
+    let labels = match input {
+        Err(e) => {
+            println!("Error reading labels file: {:?}", e);
+            // process::exit(1);
+            HashMap::new()
+        }
+        Ok(i) => parse_input_labels(i)
+    };
+
+    let input = read_vocab_labels_file();
+    let vocab_labels = match input {
+        Err(e) => {
+            println!("Error reading labels file: {:?}", e);
+            // process::exit(1);
+            HashMap::new()
+        }
+        Ok(i) => parse_label_to_item_map(i)
+    };
+    (vocab, labels, vocab_labels)
+}
+
+fn main() {
+    let (vocab,
+        labels,
+        vocab_labels) = load_data();
+    println!("{:?}, {:?}, {:?}", vocab, labels, vocab_labels);
 }
