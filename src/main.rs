@@ -11,7 +11,7 @@ use csv::DeserializeRecordsIter;
 
 const VOCAB_FILE: &str = "vocab.csv";
 const LABELS_FILE: &str = "labels.csv";
-const LABEL_MAP_FILE: &str = "label_map.csv";
+const LABEL_MAP_FILE: &str = "label_mapping.csv";
 
 #[derive(Deserialize, Debug)]
 struct VocabItem {
@@ -43,17 +43,70 @@ struct ItemLabel {
     label_id: usize,
 }
 
+struct Vocab {
+    vocab: HashMap<usize, VocabItem>,
+    labels: HashMap<usize, Label>,
+    label_mapping: Vec<ItemLabel>
+}
+
+impl Vocab {
+    fn load(vocab_filename: &str, labels_filename: &str, mapping_filename: &str) -> Vocab {
+        let input = read_vocab_file();
+        let vocab = match input {
+            Err(e) => {
+                println!("Error loading vocab: {}", e);
+                process::exit(1);
+            }
+            Ok(i) => to_id_map(i)
+        };
+
+        let input = read_labels_file();
+        let labels = match input {
+            Err(e) => {
+                println!("Error reading labels file: {:?}", e);
+                process::exit(1);
+            }
+            Ok(i) => to_id_map(i)
+        };
+
+        let input = read_vocab_labels_file();
+        let label_mapping = match input {
+            Err(e) => {
+                println!("Error reading labels file: {:?}", e);
+                process::exit(1);
+            }
+            Ok(i) => i
+        };
+        Vocab {
+            vocab,
+            labels,
+            label_mapping
+        }
+    }
+}
+
+
+trait HasId {
+    fn id(&self) -> usize;
+}
+
+impl HasId for VocabItem {
+    fn id(&self) -> usize {
+        self.id
+    }
+}
+
+impl HasId for Label {
+    fn id(&self) -> usize {
+        self.id
+    }
+}
+
 fn read_vocab_file() -> Result<Vec<VocabItem>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(VOCAB_FILE)?;
     Ok(rdr.deserialize()
         .map(Result::unwrap)
         .collect())
-}
-
-fn parse_input_vocab(items: Vec<VocabItem>) -> HashMap<usize, VocabItem> {
-    items.into_iter()
-        .map(|i| (i.id, i))
-        .collect()
 }
 
 fn read_labels_file() -> Result<Vec<Label>, Box<dyn Error>> {
@@ -63,12 +116,6 @@ fn read_labels_file() -> Result<Vec<Label>, Box<dyn Error>> {
         .collect())
 }
 
-fn parse_input_labels(items: Vec<Label>) -> HashMap<usize, Label> {
-    items.into_iter()
-        .map(|i| (i.id, i))
-        .collect()
-}
-
 fn read_vocab_labels_file() -> Result<Vec<ItemLabel>, Box<dyn Error>> {
     let mut rdr = csv::Reader::from_path(LABEL_MAP_FILE)?;
     Ok(rdr.deserialize()
@@ -76,48 +123,13 @@ fn read_vocab_labels_file() -> Result<Vec<ItemLabel>, Box<dyn Error>> {
         .collect())
 }
 
-fn parse_label_to_item_map(items: Vec<ItemLabel>) -> HashMap<usize, usize> {
+fn to_id_map<T: HasId>(items: Vec<T>) -> HashMap<usize, T> {
     items.into_iter()
-        .map(|i| (i.label_id, i.item_id))
+        .map(|i| (i.id(), i))
         .collect()
 }
 
-fn load_data() -> (HashMap<usize, VocabItem>, HashMap<usize, Label>, HashMap<usize, usize>) {
-    let input = read_vocab_file();
-    let vocab = match input {
-        Err(e) => {
-            println!("Error loading vocab: {}", e);
-            process::exit(1);
-        }
-        Ok(i) => parse_input_vocab(i)
-    };
-    println!("{:?}", vocab);
-
-    let input = read_labels_file();
-    let labels = match input {
-        Err(e) => {
-            println!("Error reading labels file: {:?}", e);
-            // process::exit(1);
-            HashMap::new()
-        }
-        Ok(i) => parse_input_labels(i)
-    };
-
-    let input = read_vocab_labels_file();
-    let vocab_labels = match input {
-        Err(e) => {
-            println!("Error reading labels file: {:?}", e);
-            // process::exit(1);
-            HashMap::new()
-        }
-        Ok(i) => parse_label_to_item_map(i)
-    };
-    (vocab, labels, vocab_labels)
-}
-
 fn main() {
-    let (vocab,
-        labels,
-        vocab_labels) = load_data();
-    println!("{:?}, {:?}, {:?}", vocab, labels, vocab_labels);
+    let vocab = Vocab::load(VOCAB_FILE, LABELS_FILE, LABEL_MAP_FILE);
+    println!("{:?}\n{:?}\n{:?}\n", vocab.vocab, vocab.labels, vocab.label_mapping);
 }
