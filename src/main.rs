@@ -1,13 +1,16 @@
 extern crate chrono;
+extern crate rand;
 
 use std::error::Error;
 use std::io;
+use std::io::*;
 use std::collections::HashMap;
 use std::process;
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use csv::DeserializeRecordsIter;
+use rand::thread_rng;
+use rand::seq::{SliceRandom, IteratorRandom};
 
 const VOCAB_FILE: &str = "vocab.csv";
 const LABELS_FILE: &str = "labels.csv";
@@ -46,7 +49,7 @@ struct ItemLabel {
 struct Vocab {
     vocab: HashMap<usize, VocabItem>,
     labels: HashMap<usize, Label>,
-    label_mapping: Vec<ItemLabel>
+    label_mapping: Vec<ItemLabel>,
 }
 
 impl Vocab {
@@ -80,11 +83,21 @@ impl Vocab {
         Vocab {
             vocab,
             labels,
-            label_mapping
+            label_mapping,
         }
+    }
+
+    fn random_items(&self, n: usize) -> Vec<&VocabItem> {
+        let mut rng = thread_rng();
+        self.vocab.values().choose_multiple(&mut rng, n)
     }
 }
 
+#[derive(Debug)]
+struct QuizResult {
+    correct: usize,
+    wrong: usize,
+}
 
 trait HasId {
     fn id(&self) -> usize;
@@ -102,24 +115,24 @@ impl HasId for Label {
     }
 }
 
-fn read_vocab_file() -> Result<Vec<VocabItem>, Box<dyn Error>> {
+fn read_vocab_file() -> Result<Vec<VocabItem>> {
     let mut rdr = csv::Reader::from_path(VOCAB_FILE)?;
     Ok(rdr.deserialize()
-        .map(Result::unwrap)
+        .map(|r| r.unwrap())
         .collect())
 }
 
-fn read_labels_file() -> Result<Vec<Label>, Box<dyn Error>> {
+fn read_labels_file() -> Result<Vec<Label>> {
     let mut rdr = csv::Reader::from_path(LABELS_FILE)?;
     Ok(rdr.deserialize()
-        .map(Result::unwrap)
+        .map(|r| r.unwrap())
         .collect())
 }
 
-fn read_vocab_labels_file() -> Result<Vec<ItemLabel>, Box<dyn Error>> {
+fn read_vocab_labels_file() -> Result<Vec<ItemLabel>> {
     let mut rdr = csv::Reader::from_path(LABEL_MAP_FILE)?;
     Ok(rdr.deserialize()
-        .map(Result::unwrap)
+        .map(|r| r.unwrap())
         .collect())
 }
 
@@ -129,7 +142,23 @@ fn to_id_map<T: HasId>(items: Vec<T>) -> HashMap<usize, T> {
         .collect()
 }
 
+fn quiz(quiz_items: Vec<&VocabItem>) -> QuizResult {
+    let mut correct = 0;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Unable to get user input");
+    println!("{}", input);
+    QuizResult {
+        correct: 0,
+        wrong: 0,
+    }
+}
+
 fn main() {
-    let vocab = Vocab::load(VOCAB_FILE, LABELS_FILE, LABEL_MAP_FILE);
-    println!("{:?}\n{:?}\n{:?}\n", vocab.vocab, vocab.labels, vocab.label_mapping);
+    let vocab = Vocab::load(
+        VOCAB_FILE,
+        LABELS_FILE,
+        LABEL_MAP_FILE);
+    const NUM_QUESTIONS: usize = 15;
+    let result = quiz(vocab.random_items(NUM_QUESTIONS));
+    println!("{:?}", result);
 }
