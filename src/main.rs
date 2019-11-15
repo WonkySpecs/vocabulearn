@@ -99,6 +99,12 @@ struct QuizResult {
     wrong: usize,
 }
 
+enum QuestionType {
+    NativeToForeign,
+    ForeignToNative,
+    Bidirectional,
+}
+
 trait HasId {
     fn id(&self) -> usize;
 }
@@ -142,14 +148,38 @@ fn to_id_map<T: HasId>(items: Vec<T>) -> HashMap<usize, T> {
         .collect()
 }
 
-fn quiz(quiz_items: Vec<&VocabItem>) -> QuizResult {
+fn quiz(quiz_items: Vec<&VocabItem>, question_type: QuestionType) -> QuizResult {
     let mut correct = 0;
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Unable to get user input");
-    println!("{}", input);
+    let mut wrong = 0;
+    let mut rng = thread_rng();
+    let no_transliterated_msg = "No transliterated version in data, crashing";
+    for item in quiz_items {
+        let (question, answer) = match question_type {
+            // TODO: Work out why we have to clone
+            QuestionType::NativeToForeign => (item.in_native_lang.clone(),
+                                              item.transliterated.clone().expect(no_transliterated_msg)),
+            QuestionType:: ForeignToNative => (item.transliterated.clone().expect(no_transliterated_msg),
+                                               item.in_native_lang.clone()),
+            QuestionType::Bidirectional => {
+                if rand::random() {
+                    (item.in_native_lang.clone(), item.transliterated.clone().expect(no_transliterated_msg))
+                } else{
+                    (item.transliterated.clone().expect(no_transliterated_msg), item.in_native_lang.clone())
+                }
+            }
+        };
+        println!("Q: {}", question);
+        let mut attempt = String::new();
+        io::stdin().read_line(&mut attempt).expect("Unable to get user input");
+        if attempt.trim().to_uppercase() == answer.trim().to_uppercase() {
+            correct += 1;
+        } else {
+            wrong += 1;
+            println!("Wrong, correct answer was {}", answer);
+        }
+    }
     QuizResult {
-        correct: 0,
-        wrong: 0,
+        correct, wrong
     }
 }
 
@@ -159,6 +189,7 @@ fn main() {
         LABELS_FILE,
         LABEL_MAP_FILE);
     const NUM_QUESTIONS: usize = 15;
-    let result = quiz(vocab.random_items(NUM_QUESTIONS));
+    let result = quiz(vocab.random_items(NUM_QUESTIONS),
+                      QuestionType::NativeToForeign);
     println!("{:?}", result);
 }
