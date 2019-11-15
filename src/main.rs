@@ -1,5 +1,6 @@
 extern crate chrono;
 extern crate rand;
+extern crate clap;
 
 use std::error::Error;
 use std::io;
@@ -10,7 +11,8 @@ use std::process;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use rand::thread_rng;
-use rand::seq::{SliceRandom, IteratorRandom};
+use rand::seq::IteratorRandom;
+use clap::{Arg, App, SubCommand};
 
 const VOCAB_FILE: &str = "vocab.csv";
 const LABELS_FILE: &str = "labels.csv";
@@ -158,12 +160,12 @@ fn quiz(quiz_items: Vec<&VocabItem>, question_type: QuestionType) -> QuizResult 
             // TODO: Work out why we have to clone
             QuestionType::NativeToForeign => (item.in_native_lang.clone(),
                                               item.transliterated.clone().expect(no_transliterated_msg)),
-            QuestionType:: ForeignToNative => (item.transliterated.clone().expect(no_transliterated_msg),
-                                               item.in_native_lang.clone()),
+            QuestionType::ForeignToNative => (item.transliterated.clone().expect(no_transliterated_msg),
+                                              item.in_native_lang.clone()),
             QuestionType::Bidirectional => {
                 if rand::random() {
                     (item.in_native_lang.clone(), item.transliterated.clone().expect(no_transliterated_msg))
-                } else{
+                } else {
                     (item.transliterated.clone().expect(no_transliterated_msg), item.in_native_lang.clone())
                 }
             }
@@ -179,17 +181,45 @@ fn quiz(quiz_items: Vec<&VocabItem>, question_type: QuestionType) -> QuizResult 
         }
     }
     QuizResult {
-        correct, wrong
+        correct,
+        wrong,
     }
 }
 
-fn main() {
+fn quiz_subprogram(quiz_type: QuestionType) {
     let vocab = Vocab::load(
         VOCAB_FILE,
         LABELS_FILE,
         LABEL_MAP_FILE);
     const NUM_QUESTIONS: usize = 15;
     let result = quiz(vocab.random_items(NUM_QUESTIONS),
-                      QuestionType::NativeToForeign);
+                      quiz_type);
     println!("{:?}", result);
+}
+
+fn main() {
+    let matches = App::new("Vocabulearn")
+        .version("0.1")
+        .author("Will Taylor")
+        .subcommand(SubCommand::with_name("quiz")
+            .about("Run a quiz")
+            .arg(Arg::with_name("type")
+                .long("type")
+                .short("t")
+                .possible_values(&["ntf", "ftn", "both"])
+                .takes_value(true)))
+        .get_matches();
+
+    match matches.subcommand() {
+        ("quiz", Some(args)) => {
+            let quiz_type = match args.value_of("type").unwrap() {
+                "ntf" => QuestionType::NativeToForeign,
+                "ftn" => QuestionType::ForeignToNative,
+                "both" => QuestionType::Bidirectional,
+                _ => unreachable!(),
+            };
+            quiz_subprogram(quiz_type);
+        },
+        _ => unreachable!()
+    };
 }
