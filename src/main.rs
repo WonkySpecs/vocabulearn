@@ -107,6 +107,12 @@ enum QuestionType {
     Bidirectional,
 }
 
+enum AnswerMatch {
+    Perfect,
+    Partial,
+    Wrong,
+}
+
 trait HasId {
     fn id(&self) -> usize;
 }
@@ -152,38 +158,52 @@ fn to_id_map<T: HasId>(items: Vec<T>) -> HashMap<usize, T> {
 
 fn quiz(quiz_items: Vec<&VocabItem>, question_type: QuestionType) -> QuizResult {
     let mut correct = 0;
-    let mut wrong = 0;
     let mut rng = thread_rng();
-    let no_transliterated_msg = "No transliterated version in data, crashing";
-    for item in quiz_items {
-        let (question, answer) = match question_type {
-            // TODO: Work out why we have to clone
-            QuestionType::NativeToForeign => (item.in_native_lang.clone(),
-                                              item.transliterated.clone().expect(no_transliterated_msg)),
-            QuestionType::ForeignToNative => (item.transliterated.clone().expect(no_transliterated_msg),
-                                              item.in_native_lang.clone()),
-            QuestionType::Bidirectional => {
-                if rand::random() {
-                    (item.in_native_lang.clone(), item.transliterated.clone().expect(no_transliterated_msg))
-                } else {
-                    (item.transliterated.clone().expect(no_transliterated_msg), item.in_native_lang.clone())
-                }
-            }
-        };
+
+    for item in &quiz_items {
+        let (question, answer) = get_qa(&question_type, item);
         println!("Q: {}", question);
         let mut attempt = String::new();
         io::stdin().read_line(&mut attempt).expect("Unable to get user input");
-        if attempt.trim().to_uppercase() == answer.trim().to_uppercase() {
-            correct += 1;
-        } else {
-            wrong += 1;
-            println!("Wrong, correct answer was {}", answer);
-        }
+        let (score, message) = match answer_match(&attempt, &answer) {
+            AnswerMatch::Perfect => (1, "Correct".to_string()),
+            AnswerMatch::Partial => (1, format!("Correct, full answer is '{}'", answer)),
+            AnswerMatch::Wrong => (0, format!("Wrong, correct answer was {}", answer))
+        };
+        correct += score;
+        println!("{}", message);
     }
+
     QuizResult {
         correct,
-        wrong,
+        wrong: quiz_items.len() - correct,
     }
+}
+
+fn get_qa(question_type: &QuestionType, item: &VocabItem) -> (String, String) {
+    let no_transliterated_msg = "No transliterated version in data, crashing";
+    match question_type {
+        // TODO: Work out why we have to clone
+        QuestionType::NativeToForeign => (item.in_native_lang.clone(),
+                                          item.transliterated.clone().expect(no_transliterated_msg)),
+        QuestionType::ForeignToNative => (item.transliterated.clone().expect(no_transliterated_msg),
+                                          item.in_native_lang.clone()),
+        QuestionType::Bidirectional => {
+            if rand::random() {
+                (item.in_native_lang.clone(), item.transliterated.clone().expect(no_transliterated_msg))
+            } else {
+                (item.transliterated.clone().expect(no_transliterated_msg), item.in_native_lang.clone())
+            }
+        }
+    }
+}
+
+
+fn answer_match(attempt: &str, answer: &str) -> AnswerMatch {
+    if attempt.trim().to_uppercase() == answer.trim().to_uppercase() {
+        return AnswerMatch::Perfect;
+    }
+    AnswerMatch::Wrong
 }
 
 fn quiz_subprogram(quiz_type: QuestionType) {
