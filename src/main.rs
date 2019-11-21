@@ -207,6 +207,7 @@ fn main() {
                 .long("type")
                 .short("t")
                 .possible_values(&["ntf", "ftn", "both"])
+                .default_value("both")
                 .takes_value(true)))
         .get_matches();
 
