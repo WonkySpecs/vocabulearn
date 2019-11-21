@@ -200,9 +200,23 @@ fn get_qa(question_type: &QuestionType, item: &VocabItem) -> (String, String) {
 
 
 fn answer_match(attempt: &str, answer: &str) -> AnswerMatch {
-    if attempt.trim().to_uppercase() == answer.trim().to_uppercase() {
+    let attempt = attempt.trim().to_uppercase();
+    let answer = answer.trim().to_uppercase();
+    if  attempt == answer {
         return AnswerMatch::Perfect;
+    } else if let Some(_) = answer.find("/") {
+        // Answers with multiple options are in form translation1/translation2/...
+        let matching_answer = answer.split("/")
+            .find(|&ans| ans == &attempt);
+        if matching_answer.is_some() {
+            return AnswerMatch::Partial;
+        }
+    } else if let Some(i) = answer.find("(") {
+        if answer.split_at(i).0 == attempt {
+            return AnswerMatch::Partial;
+        }
     }
+
     AnswerMatch::Wrong
 }
 
