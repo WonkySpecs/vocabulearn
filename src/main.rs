@@ -2,11 +2,10 @@ extern crate rand;
 extern crate clap;
 
 use std::io;
+use data::{QuizResult, QuestionType, AnswerMatch, VocabItem};
 
 mod cli;
 mod data;
-
-use data::{QuizResult, QuestionType, AnswerMatch, VocabItem};
 
 const VOCAB_FILE: &str = "vocab.csv";
 const LABELS_FILE: &str = "labels.csv";
@@ -99,18 +98,20 @@ fn answer_match(attempt: &str, answer: &str) -> AnswerMatch {
 
     AnswerMatch::Wrong
 }
+
 fn vocab_subprogram(args: &clap::ArgMatches) {
     match args.subcommand() {
         ("add", Some(args)) => {
             let parse_arg = |arg| args.value_of(arg).unwrap();
-            add_vocab_item(parse_arg("native"), parse_arg("transliterated"));
+            let vocab = load_vocab();
+            add_vocab_item(vocab, parse_arg("native"), parse_arg("transliterated"));
         },
         _ => unreachable!(),
     };
 }
 
-fn add_vocab_item(native: &str, transliterated: &str) {
-    println!("{} = {}", native, transliterated);
+fn add_vocab_item(mut vocab: data::Vocab, native: &str, transliterated: &str) {
+    vocab.add_item(native, transliterated);
 }
 
 

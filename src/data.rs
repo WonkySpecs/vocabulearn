@@ -4,13 +4,14 @@ extern crate rand;
 use std::io::Result;
 use std::collections::HashMap;
 use std::process;
+use std::fs;
 
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct VocabItem {
     id: usize,
     pub in_native_lang: String,
@@ -20,21 +21,21 @@ pub struct VocabItem {
 }
 
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 enum LabelType {
     WordType,
     WordArea,
     Group,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 struct Label {
     id: usize,
     display_name: String,
     label_type: LabelType,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 struct ItemLabel {
     item_id: usize,
     label_id: usize,
@@ -44,6 +45,9 @@ pub struct Vocab {
     vocab: HashMap<usize, VocabItem>,
     labels: HashMap<usize, Label>,
     label_mapping: Vec<ItemLabel>,
+    vocab_file: String,
+    labels_file: String,
+    map_file: String,
 }
 
 impl Vocab {
@@ -78,12 +82,42 @@ impl Vocab {
             vocab,
             labels,
             label_mapping,
+            vocab_file: vocab_filename.to_string(),
+            labels_file: labels_filename.to_string(),
+            map_file: mapping_filename.to_string(),
         }
     }
 
     pub fn random_items(&self, n: usize) -> Vec<&VocabItem> {
         let mut rng = thread_rng();
         self.vocab.values().choose_multiple(&mut rng, n)
+    }
+
+    pub fn add_item(&mut self, native: &str, transliterated: &str) {
+        let max_id = self.vocab.keys().max().unwrap();
+        let new_item = VocabItem {
+            id: max_id + 1,
+            in_native_lang: native.to_string(),
+            transliterated: Some(transliterated.to_string()),
+            in_original_lang: Option::None,
+            time_added: Utc::now(),
+        };
+        self.vocab.insert(new_item.id, new_item);
+        self.save_vocab();
+    }
+
+    fn save_vocab(&self) -> std::result::Result<(), Box<std::error::Error>> {
+        let new_file = "new_".to_owned() + &self.vocab_file;
+        let archive_file = "old_".to_owned() + &self.vocab_file;
+        let mut wtr = csv::Writer::from_path(&new_file)?;
+        for item in self.vocab.values() {
+            wtr.serialize(item)?;
+        }
+        wtr.flush()?;
+
+        fs::rename(&self.vocab_file, archive_file);
+        fs::rename(new_file, &self.vocab_file);
+        Ok(())
     }
 }
 
