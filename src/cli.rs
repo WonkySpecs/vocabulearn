@@ -2,6 +2,9 @@ extern crate clap;
 
 use clap::{Arg, App, ArgMatches, SubCommand};
 
+pub const QUIZ: &str = "quiz";
+pub const VOCAB: &str = "vocab";
+
 pub fn run_app() -> ArgMatches<'static> {
     App::new("Vocabulearn")
         .version("0.1")
@@ -21,12 +24,21 @@ fn quiz_subcommand() -> App<'static, 'static> {
             .possible_values(&["ntf", "ftn", "both"])
             .default_value("both")
             .takes_value(true))
+        .arg(Arg::with_name("num-questions")
+            .long("num-questions")
+            .short("n")
+            .default_value("10")
+            .takes_value(true))
 }
 
 fn vocab_subcommand() -> App<'static, 'static> {
-    SubCommand::with_name("vocab")
+    SubCommand::with_name(VOCAB)
         .about("Manage vocab items")
-        .arg(Arg::with_name("add")
-            .short("a")
-            .long("add"))
+        .subcommand(SubCommand::with_name("add")
+            .arg(Arg::with_name("native")
+                .required(true)
+                .index(1))
+            .arg(Arg::with_name("transliterated")
+                .required(true)
+                .index(2)))
 }
