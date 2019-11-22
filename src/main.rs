@@ -1,6 +1,7 @@
 extern crate chrono;
 extern crate rand;
-extern crate clap;
+
+mod cli;
 
 use std::error::Error;
 use std::io;
@@ -12,7 +13,6 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use rand::thread_rng;
 use rand::seq::IteratorRandom;
-use clap::{Arg, App, SubCommand};
 
 const VOCAB_FILE: &str = "vocab.csv";
 const LABELS_FILE: &str = "labels.csv";
@@ -232,18 +232,7 @@ fn quiz_subprogram(quiz_type: QuestionType) {
 }
 
 fn main() {
-    let matches = App::new("Vocabulearn")
-        .version("0.1")
-        .author("Will Taylor")
-        .subcommand(SubCommand::with_name("quiz")
-            .about("Run a quiz")
-            .arg(Arg::with_name("type")
-                .long("type")
-                .short("t")
-                .possible_values(&["ntf", "ftn", "both"])
-                .default_value("both")
-                .takes_value(true)))
-        .get_matches();
+    let matches = cli::run_app();
 
     match matches.subcommand() {
         ("quiz", Some(args)) => {
@@ -255,6 +244,7 @@ fn main() {
             };
             quiz_subprogram(quiz_type);
         },
+        ("vocab", Some(args)) => println!("{:?}", args),
         _ => unreachable!()
     };
 }
